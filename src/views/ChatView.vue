@@ -1,37 +1,35 @@
 <template>
   <div class="flex flex-col h-full p-4">
-    <!-- Welcome Headers (fixed at top) -->
-    <h1 class="text-3xl font-bold mb-2">Hello User...</h1>
-    <h2 class="text-lg text-gray-300 mb-4">Welcome to the chat, I am your Bangalore buddy. You can ask me anything the city!</h2>
-
     <!-- Scrollable Chat Messages Area -->
-    <div class="flex-grow overflow-y-auto">
-      <div class="flex flex-col-reverse min-h-full">
-        <!-- Dynamic Chat Messages -->
-        <div v-for="(msg, index) in messages" :key="index" class="mb-2"
-             :class="{ 'text-right': msg.sender === 'user' }">
-          <p class="p-2 rounded-xl block break-words max-w-[80%]"
-             :class="{ 'bg-black ml-auto': msg.sender === 'user', 'bg-gray-700 mr-auto': msg.sender === 'bot' }">
-            {{ msg.text }}
-          </p>
-        </div>
+    <div class="flex-grow overflow-y-auto flex flex-col"> <!-- flex-col here -->
+      <div class="flex-grow"></div> <!-- Spacer to push content to bottom -->
 
-        <!-- Recommendation Buttons (Conditional, inside scrollable area, will appear above messages due to reverse) -->
-        <template v-if="messages.length === 0">
-          <div class="flex flex-wrap justify-end gap-2 mb-2">
-            <button v-for="(rec, index) in recommendations" :key="index"
-                    @click="selectRecommendation(rec)"
-                    class="bg-black p-2 rounded-lg text-customText text-sm focus:outline-none hover:bg-gray-600">
-              {{ rec }}
-            </button>
-          </div>
-        </template>
+      <!-- Dynamic Chat Messages -->
+      <div v-for="(msg, index) in messages" :key="index" class="mb-2"
+           :class="{ 'text-right': msg.sender === 'user' }">
+        <p class="p-2 rounded-xl block break-words max-w-[80%]"
+           :class="{ 'bg-black ml-auto': msg.sender === 'user', 'bg-gray-700 mr-auto': msg.sender === 'bot' }">
+          {{ msg.text }}
+        </p>
       </div>
+
+      <!-- Welcome Headers and Recommendation Buttons (Conditional, will appear above messages due to spacer) -->
+      <template v-if="messages.length === 0">
+        <h1 class="text-3xl font-bold mb-2">Hello User...</h1>
+        <h2 class="text-lg text-gray-300 mb-4">Welcome to the chat, I am your Bangalore buddy. You can ask me anything the city!</h2>
+        <div class="flex flex-wrap justify-end gap-2 mb-2">
+          <button v-for="(rec, index) in recommendations" :key="index"
+                  @click="selectRecommendation(rec)"
+                  class="bg-black p-2 rounded-lg text-customText text-sm focus:outline-none hover:bg-gray-600">
+            {{ rec }}
+          </button>
+        </div>
+      </template>
     </div>
 
     <!-- Chat input area (fixed at bottom) -->
     <div class="flex items-end mt-4">
-      <textarea ref="textareaRef" placeholder="Chat here..." class="flex-grow bg-black text-customText p-3 rounded-full focus:outline-none resize-none overflow-hidden break-words whitespace-pre-wrap"
+      <textarea ref="textareaRef" placeholder="Chat here..." class="flex-grow bg-black text-customText p-3 rounded-lg focus:outline-none resize-none overflow-hidden break-words whitespace-pre-wrap"
                 v-model="messageInput" @input="adjustTextareaHeight" @keyup.enter.prevent="sendMessage"
                 :style="{ 'max-height': textareaMaxHeight }"></textarea>
       <button @click="sendMessage" class="ml-2 w-10 h-10 rounded-full bg-black flex items-center justify-center">
@@ -65,7 +63,7 @@ const sendMessage = async () => {
   if (messageInput.value.trim() === '') return
 
   // Add user message
-  messages.value.unshift({ text: messageInput.value, sender: 'user' })
+  messages.value.push({ text: messageInput.value, sender: 'user' }) // Use push for normal order
 
   const userMessage = messageInput.value // Store message before clearing input
   messageInput.value = '' // Clear input after sending
@@ -75,7 +73,15 @@ const sendMessage = async () => {
 
   // Simulate bot response using API
   const response = await getChatResponse(userMessage)
-  messages.value.unshift({ text: response.response, sender: 'bot' })
+  messages.value.push({ text: response.response, sender: 'bot' })
+
+  // Scroll to bottom after new messages
+  nextTick(() => {
+    const chatMessagesArea = document.querySelector('.overflow-y-auto')
+    if (chatMessagesArea) {
+      chatMessagesArea.scrollTop = chatMessagesArea.scrollHeight
+    }
+  })
 }
 
 const adjustTextareaHeight = () => {

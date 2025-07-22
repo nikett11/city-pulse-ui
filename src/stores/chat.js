@@ -11,7 +11,7 @@ export const useChatStore = defineStore('chat', {
       this.messageInput = text
     },
     addMessage(message) {
-      this.messages.unshift(message)
+      this.messages.push(message)
     },
     async sendMessage(userMessage) {
       if (userMessage.trim() === '') return

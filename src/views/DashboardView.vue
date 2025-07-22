@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col flex-grow">
+  <div class="flex flex-col flex-grow p-4">
     <template v-if="isLoading">
       <div class="flex flex-col items-center justify-center flex-grow">
         <LoadingSpinner />
@@ -7,7 +7,7 @@
       </div>
     </template>
     <template v-else>
-      <div class="flex flex-col flex-grow p-4">
+      <div class="p-4 pt-4">
         <h2 class="text-2xl font-bold mb-4">Your Updates</h2>
         <ExpandableList>
           <li v-for="event in events" :key="event.id" class="mb-1">
@@ -37,10 +37,15 @@ const eventsStore = useEventsStore()
 const { events } = storeToRefs(eventsStore) // Ensure reactivity
 
 onMounted(async () => {
+  console.log('DashboardView: onMounted fired.')
+  console.log('DashboardView: Events in store before fetch:', eventsStore.events.length)
+  
   isLoading.value = true // Set loading to true
   eventsStore.clearEvents() // Clear existing events
   const initialEvents = await getInitialEvents()
+  console.log('DashboardView: Fetched initial events:', initialEvents.length)
   eventsStore.setEvents(initialEvents) // Use setEvents to replace the array reactively
+  console.log('DashboardView: Events in store after fetch:', eventsStore.events.length)
   isLoading.value = false // Set loading to false after fetch
 })
 </script>

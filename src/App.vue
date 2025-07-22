@@ -2,7 +2,7 @@
   <div class="min-h-screen bg-customBackground text-customText flex flex-col" @click="handleGlobalClick">
     <Header v-if="$route.name !== 'auth'" ref="headerRef" :pageTitle="$route.name" />
     <main class="flex-grow pt-24 flex flex-col">
-      <router-view />
+      <router-view class="flex-grow" />
     </main>
   </div>
 </template>
