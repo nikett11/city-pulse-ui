@@ -1,12 +1,7 @@
 <template>
-  <div class="min-h-screen bg-black text-white flex flex-col">
-    <Header @toggle-sidebar="toggleSidebar" />
-    <Sidebar :isOpen="isSidebarOpen" @close-sidebar="closeSidebar" />
-
-    <!-- Overlay for when sidebar is open -->
-    <div v-if="isSidebarOpen" class="fixed inset-0 bg-black opacity-50 z-40" @click="closeSidebar"></div>
-
-    <main class="flex-grow pt-16">
+  <div class="min-h-screen bg-customBackground text-customText flex flex-col" @click="handleGlobalClick">
+    <Header v-if="$route.name !== 'auth'" ref="headerRef" :pageTitle="$route.name" />
+    <main class="flex-grow pt-24 flex flex-col">
       <router-view />
     </main>
   </div>
@@ -14,17 +9,18 @@
 
 <script setup>
 import { ref } from 'vue'
+import { useRoute } from 'vue-router'
 import Header from './components/Header.vue'
-import Sidebar from './components/Sidebar.vue'
 
-const isSidebarOpen = ref(false)
+const headerRef = ref(null)
+const route = useRoute()
 
-const toggleSidebar = () => {
-  isSidebarOpen.value = !isSidebarOpen.value
-}
-
-const closeSidebar = () => {
-  isSidebarOpen.value = false
+const handleGlobalClick = (event) => {
+  // Check if the click originated from within the header or any of its children
+  if (headerRef.value && !headerRef.value.$el.contains(event.target)) {
+    // If the click is outside the header, close all menus
+    headerRef.value.closeAllMenus()
+  }
 }
 </script>
 

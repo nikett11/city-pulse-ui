@@ -7,6 +7,12 @@ export const useEventsStore = defineStore('events', {
   actions: {
     addEvent(event) {
       this.events.push(event)
+    },
+    setEvents(newEvents) {
+      this.events = newEvents
+    },
+    clearEvents() {
+      this.events = []
     }
   }
 })
