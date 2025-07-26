@@ -37,6 +37,15 @@
             <span v-if="!profileData.interests || profileData.interests.length === 0" class="text-gray-500 text-sm">None selected</span>
           </div>
         </div>
+        <div class="mt-4">
+          <p class="text-gray-400 text-sm">Last Known Location:</p>
+          <p v-if="profileData.lastKnownLocation" class="text-customText text-lg font-semibold">
+            Lat: {{ profileData.lastKnownLocation.latitude?.toFixed(4) }}, Lng: {{ profileData.lastKnownLocation.longitude?.toFixed(4) }}
+            <br>
+            <span class="text-gray-500 text-sm">({{ formatTimestamp(profileData.lastKnownLocation.timestamp) }})</span>
+          </p>
+          <p v-else class="text-gray-500 text-sm">Location data not available.</p>
+        </div>
       </div>
     </template>
     <template v-else>
@@ -59,6 +68,12 @@ const authStore = useAuthStore()
 const profileData = ref(null)
 const isLoading = ref(true)
 const error = ref(null)
+
+const formatTimestamp = (timestamp) => {
+  if (!timestamp) return 'N/A';
+  const date = new Date(timestamp);
+  return date.toLocaleString();
+};
 
 onMounted(async () => {
   if (!authStore.user) {

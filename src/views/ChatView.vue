@@ -40,11 +40,12 @@
 </template>
 
 <script setup>
-import { ref, nextTick, onMounted } from 'vue'
-import { getChatResponse } from '../services/ConciergeAgentAPI'
+import { ref, nextTick, onMounted, watch } from 'vue'
+import { useChatStore } from '../stores/chat'
+import { storeToRefs } from 'pinia'
 
-const messageInput = ref('')
-const messages = ref([]) // Array to store chat messages
+const chatStore = useChatStore()
+const { messageInput, messages } = storeToRefs(chatStore)
 const textareaRef = ref(null)
 const textareaMaxHeight = ref('33vh') // 1/3rd of viewport height
 
@@ -62,18 +63,12 @@ const selectRecommendation = (rec) => {
 const sendMessage = async () => {
   if (messageInput.value.trim() === '') return
 
-  // Add user message
-  messages.value.push({ text: messageInput.value, sender: 'user' }) // Use push for normal order
-
   const userMessage = messageInput.value // Store message before clearing input
+  await chatStore.sendMessage(userMessage) // Use the store's sendMessage action
   messageInput.value = '' // Clear input after sending
   nextTick(() => {
     adjustTextareaHeight() // Reset textarea height after sending
   })
-
-  // Simulate bot response using API
-  const response = await getChatResponse(userMessage)
-  messages.value.push({ text: response.response, sender: 'bot' })
 
   // Scroll to bottom after new messages
   nextTick(() => {
@@ -100,6 +95,19 @@ onMounted(() => {
   if (textareaRef.value) {
     textareaRef.value.style.height = '48px'
   }
+  // Adjust height if messageInput is pre-filled on mount
+  if (messageInput.value) {
+    nextTick(() => {
+      adjustTextareaHeight()
+      sendMessage() // Automatically send the message if pre-filled
+    })
+  }
+})
+
+watch(messageInput, () => {
+  nextTick(() => {
+    adjustTextareaHeight()
+  })
 })
 
 </script>

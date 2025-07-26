@@ -5,7 +5,7 @@
       Log Out
     </a>
     <a class="block px-4 py-2 text-sm text-gray-500 cursor-not-allowed">My Subscription (Coming soon...)</a>
-    <a href="#" @click.prevent="closeMenu" class="block px-4 py-2 text-sm text-customText hover:bg-gray-700">Help</a>
+    <router-link to="/help" @click="closeMenu" class="block px-4 py-2 text-sm text-customText hover:bg-gray-700">Help</router-link>
   </div>
 </template>
 

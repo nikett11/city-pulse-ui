@@ -16,7 +16,8 @@ export const useAuthStore = defineStore('auth', {
     loading: false,
     error: null,
     hasSelectedInterests: false,
-    _authInitialized: false // Internal flag to track if initAuth has completed
+    _authInitialized: false, // Internal flag to track if initAuth has completed
+    locationUpdateInterval: null // To store the interval ID for location tracking
   }),
   actions: {
     async signUp(email, password, name, dob) {
@@ -101,15 +102,20 @@ export const useAuthStore = defineStore('auth', {
             // Fetch user profile from Firestore
             const userDoc = await getDoc(doc(db, 'city-pulse-ui-users', this.user.uid))
             if (userDoc.exists()) {
-              this.hasSelectedInterests = userDoc.data().hasSelectedInterests || false
+              const userData = userDoc.data();
+              this.hasSelectedInterests = userData.hasSelectedInterests || false;
+              this.user.lastKnownLocation = userData.lastKnownLocation || null; // Populate lastKnownLocation
             } else {
               // This case should ideally not happen if user signed up via our app
-              this.hasSelectedInterests = false
+              this.hasSelectedInterests = false;
+              this.user.lastKnownLocation = null;
             }
+            this.startLocationTracking(); // Start tracking location on successful login
           } else {
             this.user = null;
             this.isAuthenticated = false;
             this.hasSelectedInterests = false;
+            this.stopLocationTracking(); // Stop tracking if user logs out or is not authenticated
           }
           this.loading = false;
           this._authInitialized = true; // Mark as initialized
@@ -124,6 +130,45 @@ export const useAuthStore = defineStore('auth', {
           hasSelectedInterests: value,
           interests: interests
         }, { merge: true }) // Use merge to update without overwriting other fields
+      }
+    },
+    async updateUserLocation(latitude, longitude) {
+      if (this.user) {
+        try {
+          await setDoc(doc(db, 'city-pulse-ui-users', this.user.uid), {
+            lastKnownLocation: {
+              latitude: latitude,
+              longitude: longitude,
+              timestamp: Date.now()
+            }
+          }, { merge: true });
+          console.log("User location updated in Firestore.");
+        } catch (error) {
+          console.error("Error updating user location:", error);
+        }
+      }
+    },
+    startLocationTracking() {
+      if (navigator.geolocation) {
+        this.locationUpdateInterval = setInterval(() => {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              this.updateUserLocation(position.coords.latitude, position.coords.longitude);
+            },
+            (error) => {
+              console.error("Error tracking user location:", error);
+            },
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+          );
+        }, 5000); // Update every 5 seconds
+      } else {
+        console.warn("Geolocation is not supported by this browser. Cannot track location.");
+      }
+    },
+    stopLocationTracking() {
+      if (this.locationUpdateInterval) {
+        clearInterval(this.locationUpdateInterval);
+        this.locationUpdateInterval = null;
       }
     }
   }

@@ -44,14 +44,36 @@
     <template v-if="currentStep === 2">
       <div class="flex-grow flex flex-col">
         <h2 class="text-xl font-bold mb-4">Upload reference (optional)</h2>
-        <div class="flex-grow bg-gray-700 flex items-center justify-center text-customText text-center p-4 rounded-lg mb-4">
-          Upload placeholder.<br>Previews before submission
+        <div class="flex-grow flex flex-col items-center justify-center p-4 rounded-lg mb-4 border-2 border-dashed border-gray-600">
+          <input type="file" id="mediaUpload" multiple accept="image/*,video/*" @change="handleFileChange" class="hidden" />
+          <label for="mediaUpload" class="cursor-pointer bg-gray-700 hover:bg-gray-600 text-customText font-bold py-2 px-4 rounded-lg">
+            Select Files
+          </label>
+          <p class="text-gray-400 text-sm mt-2">Images or Videos (Max 5 files)</p>
+
+          <div v-if="mediaPreviews.length > 0" class="mt-4 grid grid-cols-3 gap-2">
+            <div v-for="(preview, index) in mediaPreviews" :key="index" class="relative w-24 h-24 bg-gray-800 rounded-lg overflow-hidden">
+              <img v-if="preview.type.startsWith('image')" :src="preview.url" class="w-full h-full object-cover" />
+              <video v-else-if="preview.type.startsWith('video')" :src="preview.url" class="w-full h-full object-cover"></video>
+              <div v-else class="w-full h-full flex items-center justify-center text-customText text-xs">File</div>
+              <button @click="removeMedia(index)" class="absolute top-1 right-1 bg-red-500 rounded-full p-1 text-white text-xs leading-none">
+                &times;
+              </button>
+            </div>
+          </div>
+
+          <div v-if="isUploading" class="mt-4 text-customText">
+            Uploading: {{ uploadProgress.toFixed(0) }}%
+          </div>
         </div>
       </div>
 
-      <div class="flex justify-end">
-        <button @click="submitReport" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-          Submit
+      <div class="flex justify-between">
+        <button @click="currentStep--" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+          Back
+        </button>
+        <button @click="submitReport" :disabled="isSubmitting || isUploading" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+          {{ isSubmitting ? 'Submitting...' : 'Submit' }}
         </button>
       </div>
     </template>
@@ -61,14 +83,89 @@
 <script setup>
 import { ref } from 'vue'
 import { submitReport as submitReportAPI } from '../services/ConciergeAgentAPI'
+import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { getFirestore, collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from '../firebase'; // Assuming firebase.js exports db
+import { useAuthStore } from '../stores/auth';
+
+const authStore = useAuthStore();
+const storage = getStorage();
 
 const currentStep = ref(1)
 
 const report = ref({
   location: '',
   incidentType: '',
-  description: ''
+  description: '',
+  media: [] // To store uploaded media URLs
 })
+
+const mediaFiles = ref([]);
+const mediaPreviews = ref([]);
+const isUploading = ref(false);
+const uploadProgress = ref(0);
+const isSubmitting = ref(false);
+
+const handleFileChange = (event) => {
+  const files = Array.from(event.target.files);
+  if (mediaFiles.value.length + files.length > 5) {
+    alert("You can upload a maximum of 5 files.");
+    return;
+  }
+
+  files.forEach(file => {
+    mediaFiles.value.push(file);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      mediaPreviews.value.push({ url: e.target.result, type: file.type });
+    };
+    reader.readAsDataURL(file);
+  });
+};
+
+const removeMedia = (index) => {
+  mediaFiles.value.splice(index, 1);
+  mediaPreviews.value.splice(index, 1);
+};
+
+const uploadMedia = async () => {
+  const downloadURLs = [];
+  if (mediaFiles.value.length === 0) return downloadURLs;
+
+  isUploading.value = true;
+  let uploadedCount = 0;
+
+  for (const file of mediaFiles.value) {
+    const uniqueFileName = `${authStore.user.uid}/${Date.now()}_${file.name}`;
+    const fileRef = storageRef(storage, uniqueFileName);
+    const uploadTask = uploadBytesResumable(fileRef, file);
+
+    await new Promise((resolve, reject) => {
+      uploadTask.on('state_changed',
+        (snapshot) => {
+          uploadProgress.value = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        },
+        (error) => {
+          console.error("Upload failed:", error);
+          alert("Media upload failed. Please try again.");
+          isUploading.value = false;
+          reject(error);
+        },
+        async () => {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          downloadURLs.push(downloadURL);
+          uploadedCount++;
+          if (uploadedCount === mediaFiles.value.length) {
+            isUploading.value = false;
+            uploadProgress.value = 0;
+            resolve();
+          }
+        }
+      );
+    });
+  }
+  return downloadURLs;
+};
 
 const nextStep = () => {
   currentStep.value++
@@ -76,21 +173,37 @@ const nextStep = () => {
 }
 
 const submitReport = async () => {
-  console.log('Submitting report:', report.value)
-  const response = await submitReportAPI(report.value)
-  if (response.success) {
-    alert(response.message)
+  isSubmitting.value = true;
+  try {
+    const mediaUrls = await uploadMedia();
+    report.value.media = mediaUrls;
+
+    const reportToSave = {
+      ...report.value,
+      userId: authStore.user.uid, // Associate report with user
+      timestamp: serverTimestamp(), // Firestore server timestamp
+    };
+
+    await addDoc(collection(db, "city-pulse-ui-reports"), reportToSave);
+
+    alert("Report submitted successfully!");
     // Clear form and reset step
     report.value = {
       location: '',
       incidentType: '',
-      description: ''
-    }
-    currentStep.value = 1
-  } else {
-    alert('Error submitting report.')
+      description: '',
+      media: []
+    };
+    mediaFiles.value = [];
+    mediaPreviews.value = [];
+    currentStep.value = 1;
+  } catch (error) {
+    console.error("Error submitting report:", error);
+    alert("Error submitting report. Please try again.");
+  } finally {
+    isSubmitting.value = false;
   }
-}
+};
 </script>
 
 <style scoped>

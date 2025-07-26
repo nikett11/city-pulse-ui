@@ -4,6 +4,8 @@ import AuthView from '../views/AuthView.vue'
 import InterestsView from '../views/InterestsView.vue'
 import ProfileView from '../views/ProfileView.vue' // Import ProfileView
 import { useAuthStore } from '../stores/auth'
+import { useEventsStore } from '../stores/events'
+import { getInitialEvents } from '../services/ConciergeAgentAPI'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -49,12 +51,19 @@ const router = createRouter({
       name: 'profile',
       component: ProfileView,
       meta: { requiresAuth: true } // Requires authentication
+    },
+    {
+      path: '/help',
+      name: 'help',
+      component: () => import('../views/HelpView.vue'),
+      meta: { requiresAuth: false } // Help page does not require authentication
     }
   ]
 })
 
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
+  const eventsStore = useEventsStore()
   
   // Ensure auth state is initialized before proceeding
   if (!authStore._authInitialized) {
@@ -74,6 +83,11 @@ router.beforeEach(async (to, from, next) => {
     // If route requires auth, user is authenticated but hasn't selected interests, and not already on interests page
     next({ name: 'interests' })
   } else {
+    // Fetch events on every route change (except for auth and interests pages)
+    if (to.name !== 'auth' && to.name !== 'interests') {
+      const initialEvents = await getInitialEvents()
+      eventsStore.setEvents(initialEvents)
+    }
     next()
   }
 })
